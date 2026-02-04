@@ -10,25 +10,38 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    
+  async validateUser(email: string, pass: string): Promise<any> {
+    // Buscamos al usuario en la tabla que acabamos de mapear
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      console.log(`[Auth] El usuario con email ${email} no existe.`);
+      return null;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Comparamos la contraseña plana con el hash de la DB
+    const isMatch = await bcrypt.compare(pass, user.password);
     
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!isMatch) {
+      console.log(`[Auth] Contraseña incorrecta para: ${email}`);
+      return null;
     }
 
-    const { password: _, ...result } = user;
+    console.log(`[Auth] Usuario validado correctamente: ${email}`);
+    
+    // Quitamos el password del objeto antes de devolverlo por seguridad
+    const { password, ...result } = user;
     return result;
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { 
+      email: user.email, 
+      sub: user.id, 
+      role: user.role 
+    };
     
     return {
       access_token: this.jwtService.sign(payload),
@@ -42,27 +55,25 @@ export class AuthService {
     };
   }
 
-  async register(data: { email: string; password: string; firstName?: string; lastName?: string }) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: data.email },
-    });
-
-    if (existingUser) {
-      throw new UnauthorizedException('Email already exists');
-    }
-
+  async register(data: any) {
+    // Encriptamos la contraseña antes de guardarla
     const hashedPassword = await bcrypt.hash(data.password, 10);
+    
+    try {
+      const newUser = await this.prisma.user.create({
+        data: {
+          ...data,
+          password: hashedPassword,
+        },
+      });
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      },
-    });
-
-    const { password: _, ...result } = user;
-    return this.login(result);
+      // Hacemos login automático al registrarse
+      return this.login(newUser);
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new UnauthorizedException('El email ya está registrado');
+      }
+      throw error;
+    }
   }
 }

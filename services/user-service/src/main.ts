@@ -1,25 +1,19 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { Transport, MicroserviceOptions } from '@nestjs/microservices';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
+  const logger = new Logger('Main');
+  
+  // 1. Crear la aplicación base (Esto permite tráfico HTTP de Nginx)
   const app = await NestFactory.create(AppModule);
-  
-  // Enable CORS
-  app.enableCors();
-  
-  // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
 
-  // Connect to RabbitMQ for microservices communication
+  // 2. Conectar el microservicio para RabbitMQ
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: [process.env.RABBITMQ_URL || 'amqp://admin:admin@rabbitmq:5672'],
+      urls: [process.env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672'],
       queue: 'user_queue',
       queueOptions: {
         durable: true,
@@ -27,12 +21,15 @@ async function bootstrap() {
     },
   });
 
-  await app.startAllMicroservices();
-  
-  const port = process.env.PORT || 3001;
-  await app.listen(port);
-  
-  console.log(`🚀 User Service is running on port ${port}`);
-}
+  // Habilitar CORS para que el Gateway no bloquee nada
+  //app.enableCors();
 
+  // 3. Iniciar ambos mundos
+  await app.startAllMicroservices();
+  logger.log('✅ User Microservice (RabbitMQ) is connected');
+
+  // 🚀 IMPORTANTE: Abrir el puerto 3001 para que Nginx no tire 502
+  await app.listen(3001, '0.0.0.0');
+  logger.log('🚀 User API (HTTP) is listening on port 3001');
+}
 bootstrap();
