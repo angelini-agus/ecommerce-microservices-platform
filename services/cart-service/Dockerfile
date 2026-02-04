@@ -1,8 +1,9 @@
-# Usamos slim que es mucho más compatible con Prisma que Alpine
+# Usamos slim que es más estable para Prisma que Alpine
 FROM node:18-slim
 
-# Instalamos OpenSSL que es lo que te está dando error
-RUN apt-get update -y && apt-get install -y openssl
+# Instalamos OpenSSL y procps (necesario para que NestJS se reinicie bien)
+# Usamos apt-get porque estamos en Debian
+RUN apt-get update -y && apt-get install -y openssl procps
 
 WORKDIR /app
 
@@ -15,7 +16,7 @@ RUN npm install
 # Copiamos el resto del código
 COPY . .
 
-# Generamos Prisma (Debian lo hará sin problemas ahora)
+# Generamos el cliente de Prisma
 RUN npx prisma generate
 
 EXPOSE 3003
