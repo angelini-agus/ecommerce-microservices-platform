@@ -1,86 +1,86 @@
 'use client'
 import { useState } from 'react';
 import axios from 'axios';
-import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setLoading(true);
     
+    console.log("Intentando conectar con:", email);
+
     try {
-      // 1. Una SOLA petición al Gateway
       const response = await axios.post('http://localhost:3000/api/auth/login', { 
         email, 
         password 
       });
 
-      console.log('Respuesta del server:', response.data);
+      console.log("Respuesta bruta del servidor:", response.data);
 
-      // 2. Verificamos que el token exista en el JSON (usando access_token con _)
-      if (response.data.access_token) {
-        // Guardamos el token
+      // VALIDACIÓN CLAVE: NestJS devuelve 'access_token' (con guion bajo)
+      if (response.data && response.data.access_token) {
+        
+        // Guardamos los datos
         localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        // Guardamos los datos del user si vienen
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-        }
-
-        alert('¡Login exitoso!');
+        alert('¡LOGIN EXITOSO! Guardado en LocalStorage.');
         
-        // 3. Redirección limpia
-        // Usamos window.location para forzar un refresh del layout de Next.js
+        // Redirección forzada para asegurar que limpie todo
         window.location.href = '/'; 
       } else {
-        setError('El servidor no devolvió un token.');
+        alert('El servidor respondió pero NO envió el access_token. Revisá la consola.');
+        console.log("Keys recibidas:", Object.keys(response.data));
       }
 
     } catch (err: any) {
-      console.error('Error en login:', err);
-      // Capturamos el mensaje de error que configuraste en NestJS
-      const mensajeError = err.response?.data?.message || 'Email o contraseña incorrectos';
-      setError(mensajeError);
+      console.error('Error capturado:', err);
+      const mensaje = err.response?.data?.message || 'Error de conexión con el servidor';
+      alert('FALLÓ EL LOGIN: ' + mensaje);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-10 flex flex-col items-center">
-      <h1 className="text-2xl font-bold mb-6">Iniciar Sesión</h1>
-      
-      <form onSubmit={handleLogin} className="flex flex-col gap-4 w-full max-w-xs">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 text-black">
+      <form onSubmit={handleLogin} className="p-10 bg-white shadow-xl rounded-xl w-full max-w-sm border border-gray-200">
+        <h1 className="text-3xl font-bold mb-8 text-center text-blue-600">Bienvenido</h1>
+        
         <input 
           type="email" 
-          placeholder="Tu email" 
+          placeholder="Email" 
           value={email}
           onChange={e => setEmail(e.target.value)} 
-          className="border p-2 rounded text-black"
+          className="border p-3 mb-4 rounded w-full focus:ring-2 focus:ring-blue-400 outline-none"
           required
         />
+        
         <input 
           type="password" 
-          placeholder="Tu contraseña" 
+          placeholder="Contraseña" 
           value={password}
           onChange={e => setPassword(e.target.value)} 
-          className="border p-2 rounded text-black"
+          className="border p-3 mb-6 rounded w-full focus:ring-2 focus:ring-blue-400 outline-none"
           required
         />
         
-        {error && <p className="text-red-500 text-sm font-bold">{error}</p>}
-        
-        <button type="submit" className="bg-green-600 hover:bg-green-700 text-white p-2 rounded transition shadow font-bold">
-          Entrar
+        <button 
+          type="submit" 
+          disabled={loading}
+          className={`w-full p-3 rounded font-bold text-white transition ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+        >
+          {loading ? 'Cargando...' : 'INGRESAR'}
         </button>
+
+        <p className="mt-6 text-center text-sm">
+          ¿No tenés cuenta? <a href="/register" className="text-blue-500 hover:underline">Registrate</a>
+        </p>
       </form>
-      
-      <p className="mt-4 text-sm text-gray-600">
-        ¿No tenés cuenta? <a href="/register" className="text-blue-500 hover:underline">Registrate acá</a>
-      </p>
     </div>
   );
 }
