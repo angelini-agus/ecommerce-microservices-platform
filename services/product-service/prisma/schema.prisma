@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // Esto asegura compatibilidad con Windows y el contenedor Linux (Debian)
   binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
@@ -9,31 +8,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- MODELOS ---
-
 model Product {
-  id          String    @id
+  // 1. ID automático
+  id          String   @id @default(uuid())
+  
   name        String
   description String
   price       Float
   imageUrl    String
   stock       Int
   
-  // Relación con Categoría (Necesaria para que el código compile)
-  categoryId  String?   // Opcional para no romper productos viejos
+  // 2. Fechas automáticas (Vital para que no falle el insert)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id])
 
-  // Mapeo a la tabla real en minúscula
   @@map("products")
 }
 
 model Category {
-  id       String    @id
-  name     String
-  
-  // Relación inversa (Buena práctica tenerla)
-  products Product[]
+  id        String   @id @default(uuid())
+  name      String
+  products  Product[]
 
-  // Mapeo a la tabla real en minúscula
   @@map("categories")
 }
